@@ -39,6 +39,7 @@ data/
 results/
 *.csv
 *.json
+!examples/Dataset/**/*.json
 *.pdf
 
 # OS
