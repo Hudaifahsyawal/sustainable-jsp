@@ -242,7 +242,9 @@ def dual_resource_JSP(
     matrix_performance["workload_std_dev"] = std_dev
     matrix_performance["workload_coef_variation"] = coef_variation
 
-    print(f'matrix_performance: {matrix_performance}')
+    print("matrix_performance:")
+    for _k, _v in matrix_performance.items():
+        print(f"  '{_k}' : {_v}")
 
     return {
         "case_reschedule": case1_reschedule,

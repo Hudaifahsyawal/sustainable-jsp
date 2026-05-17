@@ -263,7 +263,7 @@ def cumulative_workload(
                 workload_list[operator_id].append(current_workload[operator_id] + additional_workload)
                 current_workload[operator_id] += additional_workload
 
-    print("Workload per operator:")
+    print("Done.\nCummulative Workload per operator:")
     for operator_id, total in current_workload.items():
         print(f"Operator {operator_id}: {round(total, 2)} kcal")
 
@@ -674,7 +674,7 @@ def cumulative_workload_resch(
             event_times[operator_id].append(ft)
             workload_list[operator_id].append(current_workload[operator_id])
 
-    print("Workload per operator:")
+    print("Done.\nCummulative Workload per operator:")
     for operator_id, total in current_workload.items():
         print(f"Operator {operator_id}: {round(total, 2)} kcal")
 

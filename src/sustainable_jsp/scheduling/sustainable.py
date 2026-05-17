@@ -103,7 +103,7 @@ def sustainableJSP_resch(
     The function supports both initial scheduling and rescheduling scenarios.
     """
     print(f"\n {'-'*20}\nStart optimization phase 1\n{'-'*20}")
-    print(f"check nilai a2_info: {a2_info}")
+    # print(f"check nilai a2_info: {a2_info}")
 
     case1_solution_phase1 = ARGA(
         case1_reschedule,
@@ -264,22 +264,38 @@ def sustainableJSP_resch(
 
     print(f"\n3 {'-' * 20}\nOptimization result\n{'-' * 20}")
 
-    print("\noperation sequence in each machine (job_id, operation_id, speed_level)")
-    ordered_tasks = list(time_schedule_phase2.keys())
-    task_speed_map = {task: time_schedule_phase2[task].get('speed_level') for task in ordered_tasks}
-    updated_sequence = {
-        machine_id: [(job_id, op_id, task_speed_map[(job_id, op_id)]) for job_id, op_id in task_list]
-        for machine_id, task_list in case1_solution_phase1[0].items()
-    }
-    for key, value in updated_sequence.items():
-        print(f'Machine {key}: {value}')
+    _schedule_rows = []
+    for (j, o), info in sorted(
+        time_schedule_phase2.items(),
+        key=lambda x: (x[1]["start_time"], x[1]["duration"]),
+    ):
+        _orig_dur = info.get("original_duration")
+        if _orig_dur is None:
+            _cell = case1_reschedule[j - 1][o - 1]
+            if _cell:
+                _orig_dur = _cell[1]
+        _schedule_rows.append(
+            {
+                "operation id": f"({j},{o})",
+                "start time": info.get("start_time"),
+                "duration": info.get("duration"),
+                "finished time": info.get("finished_time"),
+                "original duration": _orig_dur,
+                "machine id": info.get("machine_id"),
+                "speed level": info.get("speed_level"),
+                "operator id": info.get("operator_id"),
+            }
+        )
+    _schedule_df = pd.DataFrame(_schedule_rows)
+    print("\nSchedule table (all operations, sorted by start time)")
+    with pd.option_context(
+        "display.max_rows", None,
+        "display.width", None,
+        "display.max_columns", None,
+    ):
+        print(_schedule_df.to_string(index=False))
 
-    print("\ntime schedule for each operation")
-    sorted_schedule = sorted(time_schedule_phase2.items(), key=lambda x: (x[1]['start_time'], x[1]['duration']))
-    for value in sorted_schedule:
-        print(f'Operation {value}')
-
-    print("\noperation assignment for each operator (job_id, operation_id, machine_id)")
+    print("\nOperation assignment (job_id, operation_id, machine_id)")
     updated_operator = {}
     for operator_id, task_list in fair_workload.items():
         updated_operator[operator_id] = []
@@ -289,8 +305,17 @@ def sustainableJSP_resch(
                     case1_reschedule[job_id - 1][operation_id - 1]):
                 machine_id = case1_reschedule[job_id - 1][operation_id - 1][0]
                 updated_operator[operator_id].append((job_id, operation_id, machine_id))
-    for key, value in updated_operator.items():
-        print(f'worker {key}: {value}')
+    _worker_series = {
+        f"worker {wid}": pd.Series([str(t) for t in tasks], dtype=object)
+        for wid, tasks in sorted(updated_operator.items(), key=lambda x: x[0])
+    }
+    _op_assign_df = pd.DataFrame(_worker_series).fillna("")
+    with pd.option_context(
+        "display.max_rows", None,
+        "display.width", None,
+        "display.max_columns", None,
+    ):
+        print(_op_assign_df.to_string())
 
     print("\nperformance of the Ant Work Balance algorithm")
     mean, variance, maximum, std_dev, coef_variation = workload_statistic(best_current_workload)
@@ -302,7 +327,9 @@ def sustainableJSP_resch(
     matrix_performance["workload_std_dev"] = std_dev
     matrix_performance["workload_coef_variation"] = coef_variation
 
-    print(f'matrix_performance: {matrix_performance}')
+    print("\nPerformance Matrix:")
+    for matrix, value in matrix_performance.items():
+        print(f"  '{matrix}' : {value}")
 
     return {
         "case_reschedule": case1_reschedule,
