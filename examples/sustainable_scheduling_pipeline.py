@@ -2,11 +2,15 @@
 Sustainable job shop scheduling: three-phase pipeline (ARGA → GANBI → AWBO).
 
 Dataset: examples/Dataset/Dataset_Jobs, Dataset_Carbon, Dataset_Operator.
-"""
 
+Optional: set SAVE_RESULTS = True to pickle the full return dict to
+Dataset/Dataset_initial_schedule/initial_schedule_{INSTANCE}.pkl
+(or set SAVE_DIR to a full .pkl path).
+"""
 from __future__ import annotations
 
 import json
+import pickle
 import sys
 from pathlib import Path
 
@@ -25,13 +29,19 @@ from sustainable_jsp.core.schedule import generate_feasible_solution2_resch, get
 from sustainable_jsp.scheduling.sustainable import sustainableJSP_resch
 
 # Instance id must match files: J{jobs}_D{ops}_M{machines} pattern in Dataset_2draft naming
-INSTANCE = "J14D30M5"
+INSTANCE = "J42D10M9"
 
 EXAMPLES_DIR = Path(__file__).resolve().parent
 DATASET_DIR = EXAMPLES_DIR / "Dataset"
 JOBS_PATH = DATASET_DIR / "Dataset_Jobs" / f"{INSTANCE}.json"
 CARBON_PATH = DATASET_DIR / "Dataset_Carbon" / f"Carbon_data_{INSTANCE}.json"
 OPERATORS_PATH = DATASET_DIR / "Dataset_Operator" / f"operators_data_{INSTANCE}.json"
+
+# After run, write full `out` dict to a single .pkl (for reschedule / reload).
+SAVE_RESULTS = True
+# Full path to the .pkl file. If None, uses
+#   Dataset/Dataset_initial_schedule/initial_schedule_{INSTANCE}.pkl
+SAVE_DIR: Path | None = None
 
 
 def load_jobs_data(path: Path) -> list:
@@ -83,7 +93,7 @@ def main() -> None:
     ELIT_PERCENTAGE2 = 0.6
     MUTATION_THRESHOLD2 = 0.5
     WEIGHT = 0.75
-    VISUALIZATION = True
+    VISUALIZATION = False
     RESCHEDULE = False
     MACHINE_START_TIME = None
     #parameters for phase 3
@@ -138,6 +148,18 @@ def main() -> None:
         flowtime_type=FLOWTIME_TYPE,
         show_progress=SHOW_PROGRESS,
     )
+
+    if SAVE_RESULTS:
+        if SAVE_DIR is None:
+            _out_dir = DATASET_DIR / f"Dataset_initial_schedule"
+            _out_dir.mkdir(parents=True, exist_ok=True)
+            pkl_path = _out_dir / f"initial_schedule_{INSTANCE}.pkl"
+        else:
+            pkl_path = Path(SAVE_DIR)
+            pkl_path.parent.mkdir(parents=True, exist_ok=True)
+        with pkl_path.open("wb") as f:
+            pickle.dump(out, f, protocol=pickle.HIGHEST_PROTOCOL)
+        print(f"\nSaved pipeline result to {pkl_path.resolve()}")
 
 
 if __name__ == "__main__":

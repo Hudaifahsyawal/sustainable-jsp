@@ -71,7 +71,8 @@ def dual_resource_JSP(
         save: bool = False,
         obj_type: str = "cmax+flowtime",
         IR: float = 3,
-        flowtime_type: str = "average"
+        flowtime_type: str = "average",
+        show_progress: bool = False,
         ) -> dict:
     """
     Solve Dual-Resource Constrained Job Shop Scheduling Problem with rescheduling capabilities using two-phase optimization.
@@ -103,7 +104,8 @@ def dual_resource_JSP(
         init_time_schedule=init_time_schedule,
         obj_type=obj_type,
         IR=IR,
-        flowtime_type=flowtime_type)
+        flowtime_type=flowtime_type,
+        show_progress=show_progress)
 
     time_schedule_phase1 = get_schedule_time(
         case1_reschedule,
