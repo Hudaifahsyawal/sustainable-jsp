@@ -386,7 +386,9 @@ def reschedule_cancelled_job(
         elit_percentage2=0.6,
         coloni_size=450,
         alpha=10,
-        beta=2):
+        beta=2,
+        workload_obj_type="variance",
+        show_progress: bool = False):
     """
     Completely Reschedule job shop operations when certain jobs are cancelled at a disruption time.
 
@@ -492,7 +494,8 @@ def reschedule_cancelled_job(
             save=save,
             obj_type=obj_type,
             IR=IR,
-            flowtime_type=flowtime_type
+            flowtime_type=flowtime_type,
+            show_progress=show_progress,
         )
         return {"mode": "dual_resource", **out}
 
@@ -538,7 +541,9 @@ def reschedule_cancelled_job(
             title=title,
             save=save,
             obj_type=obj_type,
+            workload_obj_type=workload_obj_type,
             IR=IR,
-            flowtime_type=flowtime_type
+            flowtime_type=flowtime_type,
+            show_progress=show_progress,
         )
         return {"mode": "sustainable", **out}
