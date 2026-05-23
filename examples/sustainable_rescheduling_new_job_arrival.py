@@ -6,17 +6,14 @@ Prerequisites:
      same INSTANCE, producing Dataset/initial_schedule/initial_schedule_{INSTANCE}.pkl
      (or Dataset/Dataset_initial_schedule/initial_schedule_{INSTANCE}.pkl).
   2. Dataset JSON files under examples/Dataset/ for carbon and operators.
-
-Generates new job(s) with generate_problem2, saves them as JSON under
-Dataset/Dataset_new_job_arrival/{INSTANCE}_NEW_T{DISRUPTION_TIME}.json
-(same list-of-operations format as Dataset_Jobs/), then runs complete reschedule.
+  3. New job data JSON under Dataset/Dataset_new_job_arrival/
+     (default: {INSTANCE}_NEW_T{DISRUPTION_TIME}.json, same format as Dataset_Jobs/).
 """
 
 from __future__ import annotations
 
 import json
 import pickle
-import random
 import sys
 from pathlib import Path
 
@@ -29,8 +26,6 @@ if str(_SRC) not in sys.path:
         sys.path.insert(0, str(_SRC))
 
 from sustainable_jsp.algorithms.workload import calculate_EErate
-from sustainable_jsp.core.problem import generate_problem2
-from sustainable_jsp.core.visualization import create_gantt_chart_final
 from sustainable_jsp.rescheduling.complete_reschedule import reschedule_new_arrival_job
 
 INSTANCE = "J42D10M9"
@@ -50,18 +45,14 @@ NEW_JOB_DATASET_DIR = DATASET_DIR / "Dataset_new_job_arrival"
 
 # Disruption scenario
 DISRUPTION_TIME = 160
-NEW_JOB_SEED = 42
 
-# New job: 1 job, 5 machines (J14D30M5), 4–6 operations, duration 15–45
-NEW_JOB_NJOBS = 1
-NEW_JOB_NMACHINES = 9 #5 #7 #9
-NEW_JOB_NOPERATIONS = (4, 6)
-NEW_JOB_DURATION_RANGE = (5, 15) #(15, 45) #(10, 30) #(5, 15)
+# New job JSON: if None, uses Dataset_new_job_arrival/{INSTANCE}_NEW_T{DISRUPTION_TIME}.json
+NEW_JOB_JSON_PATH: Path | None = None
 
 # reschedule_new_arrival_job / sustainableJSP_resch (complete reschedule)
 DUAL_RESOURCE = False
 WEIGHT = 0.75
-VISUALIZATION = False
+VISUALIZATION = True
 OBJ_TYPE = "cmax"
 WORKLOAD_OBJ_TYPE = "variance"
 IR = 3
@@ -93,31 +84,30 @@ def load_operator_data(path: Path) -> dict[int, dict]:
     return {int(k): v for k, v in raw.items()}
 
 
-def jobs_to_dataset_json(jobs_data: list) -> list:
-    """Convert internal job list (tuples) to JSON format used in Dataset_Jobs/."""
-    return [[[int(m), int(d)] for m, d in job] for job in jobs_data]
+def load_new_job_arrival_json(path: Path) -> list:
+    """Load new job(s) from JSON (same list-of-operations format as Dataset_Jobs/)."""
+    with path.open("r", encoding="utf-8") as f:
+        loaded = json.load(f)
+    return [[tuple(op) for op in job] for job in loaded]
 
 
-def format_jobs_json_compact(jobs_data: list) -> str:
-    """Serialize jobs like Dataset_Jobs/: one job per line, compact [machine,duration] pairs."""
-    jobs = jobs_to_dataset_json(jobs_data)
-    lines = ["["]
-    for i, job in enumerate(jobs):
-        job_line = json.dumps(job, separators=(",", ":"))
-        suffix = "," if i < len(jobs) - 1 else ""
-        lines.append(f" {job_line}{suffix}")
-    lines.append("]")
-    return "\n".join(lines) + "\n"
+def new_job_arrival_json_path(instance: str, disruption_time: float | int) -> Path:
+    t = int(disruption_time) if float(disruption_time) == int(disruption_time) else disruption_time
+    return NEW_JOB_DATASET_DIR / f"{instance}_NEW_T{t}.json"
 
 
-def new_job_arrival_json_path(instance: str, disruption_time: float) -> Path:
-    return NEW_JOB_DATASET_DIR / f"{instance}_NEW_T{disruption_time}.json"
-
-
-def save_new_job_arrival_json(jobs_data: list, instance: str, disruption_time: float) -> Path:
-    NEW_JOB_DATASET_DIR.mkdir(parents=True, exist_ok=True)
-    path = new_job_arrival_json_path(instance, disruption_time)
-    path.write_text(format_jobs_json_compact(jobs_data), encoding="utf-8")
+def resolve_new_job_arrival_path() -> Path:
+    if NEW_JOB_JSON_PATH is not None:
+        path = Path(NEW_JOB_JSON_PATH)
+        if not path.is_file():
+            raise FileNotFoundError(f"New job JSON not found: {path}")
+        return path
+    path = new_job_arrival_json_path(INSTANCE, DISRUPTION_TIME)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"New job JSON not found: {path}\n"
+            f"Place file under {NEW_JOB_DATASET_DIR} or set NEW_JOB_JSON_PATH."
+        )
     return path
 
 
@@ -165,16 +155,10 @@ def main() -> None:
     operator_data = load_operator_data(OPERATORS_PATH)
     eerate = calculate_EErate(operator_data)
 
-    random.seed(NEW_JOB_SEED)
-    new_job = generate_problem2(
-        NEW_JOB_NJOBS,
-        NEW_JOB_NMACHINES,
-        NEW_JOB_NOPERATIONS,
-        NEW_JOB_DURATION_RANGE,
-    )
-    new_job_json_path = save_new_job_arrival_json(new_job, INSTANCE, DISRUPTION_TIME)
+    new_job_json_path = resolve_new_job_arrival_path()
+    new_job = load_new_job_arrival_json(new_job_json_path)
     print(f"\nNew job arrival (disruption_time={DISRUPTION_TIME}):")
-    print(f"Saved to {new_job_json_path.resolve()}")
+    print(f"Loaded from {new_job_json_path.resolve()}")
     for i, job in enumerate(new_job, start=len(case) + 1):
         print(f"  Job {i}: {job}")
 

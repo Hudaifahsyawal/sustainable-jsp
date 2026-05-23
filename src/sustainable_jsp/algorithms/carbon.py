@@ -447,12 +447,56 @@ def GANBI(
     show_progress: bool = False,
     bar_position: int = 0) -> dict:
     """
-    Executes a complete genetic algorithm procedure for Phase 2 optimization: carbon-aware speed level assignment.
+    Run the GA-based Non-dominated BI-objective (GANBI) optimizer for Phase 2.
 
-    This function implements a genetic algorithm to optimize speed levels for all operations in a
-    Job Shop Scheduling problem, balancing time objectives (e.g., Cmax, Flowtime) with total carbon
-    emissions. It is designed as Phase 2 optimization, following Phase 1 which determines the
-    optimal machine-operation sequences.
+    Optimizes the **speed level** of each operation to balance the time objective
+    (Cmax or flowtime) against total carbon emissions. Uses a weighted-sum
+    scalarization normalized by lower/upper bounds computed from Phase 1 results.
+
+    Parameters
+    ----------
+    jobs_data : list of list of tuple or None
+        Job data (same format as :func:`sustainableJSP_resch`).
+    schedule_jobs_data_ori : dict
+        Phase 1 time schedule. Keys are ``(job_id, op_id)``, values are dicts
+        with ``"start_time"``, ``"duration"``, ``"machine_id"``, etc.
+    solution_phase1_jobs_data : dict[int, list]
+        Phase 1 solution — machine → ordered operation list.
+    carbon_emission_data : dict[int, list[float]]
+        Carbon emission rates per machine for each speed level.
+    num_iterations2 : int, optional
+        Number of GA generations. Default 1500.
+    population_size2 : int, optional
+        Population size. Default 75.
+    elit_percentage2 : float, optional
+        Elite fraction. Default 0.6.
+    mutation_threshold2 : float, optional
+        Mutation probability. Default 0.5.
+    weight : float, optional
+        Weight for the time objective in the scalarized fitness. ``1-weight``
+        is applied to carbon. Default 0.75.
+    visualization : bool, optional
+        Show the Gantt chart after optimization. Default ``False``.
+    reschedule : bool, optional
+        Enable rescheduling mode. Default ``False``.
+    machine_start_time : dict[int, float] or None, optional
+        Earliest available time per machine. Default ``None``.
+    obj_type : str, optional
+        Time objective type. Default ``"cmax"``.
+    IR : float, optional
+        Impact ratio for combined objective. Default 3.
+    flowtime_type : str, optional
+        ``"average"`` or ``"total"`` flowtime. Default ``"average"``.
+    show_progress : bool, optional
+        Show a ``tqdm`` progress bar. Default ``False``.
+    bar_position : int, optional
+        ``tqdm`` bar position. Default 0.
+
+    Returns
+    -------
+    dict
+        Keys: ``"speedlevel_optimum"``, ``"final_schedule_time"``,
+        ``"matrix_performance"``, ``"bound"``.
     """
     if machine_start_time is None:
         machine_start_time = {}

@@ -219,12 +219,57 @@ def ARGA(
         show_progress=False,
         bar_position=0):
     """
-    Execute a complete genetic algorithm procedure for Job Shop Scheduling Problem optimization.
+    Run the Adaptive Repair Genetic Algorithm (ARGA) for JSP Phase 1 optimization.
 
-    Implements a customizable genetic algorithm (GA) for solving job shop scheduling problems.
-    The algorithm uses evolutionary operators (selection, crossover, mutation) to evolve a
-    population of solutions over multiple generations, finding high-quality schedules that
-    minimize the specified objective function (Cmax, flowtime, or combined metric).
+    Evolves a population of machine-operation sequences over ``num_iterations1``
+    generations using selection, crossover, and mutation operators. Returns the
+    best solution (sequence + objective value) found.
+
+    Parameters
+    ----------
+    job_data : list of list of tuple or None
+        Job data. Each job is a list of ``(machine_id, duration)`` tuples.
+        ``None`` entries are skipped (finished/cancelled operations).
+    population_size1 : int, optional
+        Number of individuals in the population. Default 75.
+    num_iterations1 : int, optional
+        Number of generations. Default 1000.
+    mutation_threshold1 : float, optional
+        Probability that a mutation is applied to a child. Default 0.5.
+    elit_percentage1 : float, optional
+        Fraction of top solutions carried over without modification. Default 0.6.
+    FSG : callable, optional
+        Feasible solution generator used to initialise the population.
+        Default ``generate_feasible_solution2``.
+    crossover : callable, optional
+        Crossover operator. Default ``crossover1``.
+    mutate : callable, optional
+        Mutation operator. Default ``mutate1N``.
+    get_schedule_time : callable, optional
+        Function that decodes a solution into a time schedule. Default
+        ``get_schedule_time_AR_resch``.
+    reschedule : bool, optional
+        Enable rescheduling mode (respects ``machine_start_time``). Default ``False``.
+    machine_start_time : dict[int, float] or None, optional
+        Earliest available time per machine (rescheduling only). Default ``None``.
+    obj_type : str, optional
+        Objective to minimise: ``"cmax"``, ``"flowtime"``, or ``"cmax+flowtime"``.
+        Default ``"cmax"``.
+    IR : float, optional
+        Impact ratio for combined objective. Default 3.
+    flowtime_type : str, optional
+        ``"average"`` or ``"total"`` flowtime. Default ``"average"``.
+    show_progress : bool, optional
+        Show a ``tqdm`` progress bar. Default ``False``.
+    bar_position : int, optional
+        ``tqdm`` bar position (useful when multiple bars run simultaneously).
+        Default 0.
+
+    Returns
+    -------
+    list
+        ``[best_solution_dict, best_objective_value, iteration_best_list]``
+        where ``best_solution_dict`` maps machine ID → ordered operation list.
     """
     if machine_start_time is None:
         machine_start_time = {}

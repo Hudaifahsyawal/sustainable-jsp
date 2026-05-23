@@ -6,10 +6,8 @@ Prerequisites:
      same INSTANCE, producing Dataset/initial_schedule/initial_schedule_{INSTANCE}.pkl
      (or Dataset/Dataset_initial_schedule/initial_schedule_{INSTANCE}.pkl).
   2. Dataset JSON files under examples/Dataset/ for carbon and operators.
-
-Saves the disruption scenario as JSON under
-Dataset/Dataset_job_cancellation/{INSTANCE}_CANCEL_T{disruption_time}.json,
-then runs complete reschedule using reschedule_cancelled_job.
+  3. Job cancellation scenario JSON under Dataset/Dataset_job_cancellation/
+     (default: {INSTANCE}_CANCEL_T{DISRUPTION_TIME}.json — list of job IDs to cancel).
 """
 
 from __future__ import annotations
@@ -28,7 +26,6 @@ if str(_SRC) not in sys.path:
         sys.path.insert(0, str(_SRC))
 
 from sustainable_jsp.algorithms.workload import calculate_EErate
-from sustainable_jsp.core.visualization import create_gantt_chart_final
 from sustainable_jsp.rescheduling.complete_reschedule import reschedule_cancelled_job
 
 # ---------------------------------------------------------------------------
@@ -49,9 +46,11 @@ INITIAL_SCHEDULE_CANDIDATES = [
 
 CANCELLATION_DATASET_DIR = DATASET_DIR / "Dataset_job_cancellation"
 
-# Disruption scenario — change DISRUPTION_TIME and CANCEL_JOB_IDS as needed
-DISRUPTION_TIME = 10      # int or float; used directly in API + filename
-CANCEL_JOB_IDS = [4,5,6]    # list of job IDs (1-indexed) to cancel; single int also valid
+# Disruption scenario — DISRUPTION_TIME selects the JSON file by name
+DISRUPTION_TIME = 10
+
+# If None, uses Dataset_job_cancellation/{INSTANCE}_CANCEL_T{DISRUPTION_TIME}.json
+CANCELLATION_JSON_PATH: Path | None = None
 
 # reschedule_cancelled_job / sustainableJSP_resch parameters
 DUAL_RESOURCE = False
@@ -97,18 +96,32 @@ def job_cancellation_json_path(instance: str, disruption_time: float | int) -> P
     return CANCELLATION_DATASET_DIR / f"{instance}_CANCEL_T{t}.json"
 
 
-def save_job_cancellation_json(
-    instance: str,
-    disruption_time: float | int,
-    cancel_job_ids: list[int],
-) -> Path:
-    CANCELLATION_DATASET_DIR.mkdir(parents=True, exist_ok=True)
-    path = job_cancellation_json_path(instance, disruption_time)
-    payload = {
-        "disruption_time": disruption_time,
-        "cancel_job_ids": sorted(int(j) for j in cancel_job_ids),
-    }
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+def load_job_cancellation_json(path: Path) -> list[int]:
+    """Load cancelled job IDs from JSON (list of ints, or {disruption_time, cancel_job_ids})."""
+    with path.open("r", encoding="utf-8") as f:
+        raw = json.load(f)
+    if isinstance(raw, list):
+        return [int(j) for j in raw]
+    if isinstance(raw, dict) and "cancel_job_ids" in raw:
+        return [int(j) for j in raw["cancel_job_ids"]]
+    raise ValueError(
+        f"Unexpected format in {path}. Expected a JSON list of job IDs or "
+        f'{{"disruption_time": ..., "cancel_job_ids": [...]}}.'
+    )
+
+
+def resolve_job_cancellation_path() -> Path:
+    if CANCELLATION_JSON_PATH is not None:
+        path = Path(CANCELLATION_JSON_PATH)
+        if not path.is_file():
+            raise FileNotFoundError(f"Job cancellation JSON not found: {path}")
+        return path
+    path = job_cancellation_json_path(INSTANCE, DISRUPTION_TIME)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Job cancellation JSON not found: {path}\n"
+            f"Place file under {CANCELLATION_DATASET_DIR} or set CANCELLATION_JSON_PATH."
+        )
     return path
 
 
@@ -156,8 +169,10 @@ def main() -> None:
     event_times = initial["event_times"]
     speedlevel_optimum = initial.get("speedlevel_optimum")
 
+    scenario_path = resolve_job_cancellation_path()
+    cancel_ids = load_job_cancellation_json(scenario_path)
+
     # Validate job IDs
-    cancel_ids = [CANCEL_JOB_IDS] if isinstance(CANCEL_JOB_IDS, int) else list(CANCEL_JOB_IDS)
     n_jobs = len(case)
     invalid = [j for j in cancel_ids if not (1 <= j <= n_jobs)]
     if invalid:
@@ -183,11 +198,9 @@ def main() -> None:
     operator_data = load_operator_data(OPERATORS_PATH)
     eerate = calculate_EErate(operator_data)
 
-    # Save scenario JSON
-    scenario_path = save_job_cancellation_json(INSTANCE, DISRUPTION_TIME, cancel_ids)
     print(f"\nJob cancellation scenario (disruption_time={DISRUPTION_TIME}):")
     print(f"  Cancelled job IDs: {cancel_ids}")
-    print(f"  Saved to {scenario_path.resolve()}")
+    print(f"  Loaded from {scenario_path.resolve()}")
 
     # print("\n--- Initial schedule (before disruption) ---")
     # create_gantt_chart_final(

@@ -13,14 +13,44 @@ def create_gantt_chart_final(
     save=False
 ):
     """
-    Create a comprehensive Gantt chart visualization of a job shop schedule.
+    Create a Gantt chart visualization of a job shop schedule.
 
-    Generates a horizontal bar chart (Gantt chart) that visualizes the job shop
-    scheduling solution. Each operation is represented as a horizontal bar on its
-    assigned machine, showing the start time, duration, and completion time. The
-    chart includes optional annotations for operator assignments and speed levels,
-    making it suitable for visualizing complex scheduling scenarios with dual-resource
-    constraints and variable-speed machines.
+    Renders a horizontal bar chart where each bar represents one operation on its
+    assigned machine. Optionally annotates operator assignments (above each bar)
+    and speed levels (below each bar).
+
+    Parameters
+    ----------
+    schedule_time : dict
+        Keys are ``(job_id, op_id)`` tuples. Each value is a dict with at least
+        ``"start_time"`` and ``"duration"`` entries.
+    machine_order : dict[int, list]
+        Machine → list of ``(job_id, op_id)`` tuples (operation sequence per machine).
+    operator_assignment : dict[int, list] or None, optional
+        Operator → list of ``(job_id, op_id)`` tasks. If provided, operator IDs
+        are annotated above each bar. Default ``None``.
+    speedlevel_list : list or None, optional
+        Speed level per operation (same order as ``schedule_time`` keys).
+        If provided, speed levels are annotated below each bar. Default ``None``.
+    x_start : float or None, optional
+        Left x-axis limit. Default ``None`` (auto).
+    x_end : float or None, optional
+        Right x-axis limit. Default ``None`` (auto).
+    title : str or None, optional
+        Chart title. Default ``None`` (uses a generic title).
+    save : bool, optional
+        If ``True``, save the chart as ``{title}.pdf``. Default ``False``.
+
+    Examples
+    --------
+    >>> from sustainable_jsp import create_gantt_chart_final
+    >>> create_gantt_chart_final(
+    ...     result["time_schedule"],
+    ...     result["solution"],
+    ...     operator_assignment=result["fair_workload"],
+    ...     speedlevel_list=result["speedlevel_optimum"],
+    ...     title="Initial schedule",
+    ... )
     """
     if title is None:
         title = 'Gantt chart of scheduling or rescheduling plan'

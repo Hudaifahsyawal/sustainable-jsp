@@ -59,13 +59,78 @@ def reschedule_new_arrival_job(
         beta=2,
         show_progress: bool = False):
     """
-    Completely Reschedule job shop operations when new jobs arrive at a disruption time.
+    Completely reschedule when new jobs arrive at a disruption time.
 
-    Handles rescheduling scenarios where new jobs arrive during the execution of an existing schedule
-    using completely reschedule strategy. It: (1) classifies existing operations into finished (A1),
-    ongoing (A2), and unprocessed (A3) categories, (2) removes finished and ongoing operations from
-    the job data, (3) adds the new arriving jobs, and (4) performs optimization using either
-    dual-resource or sustainable scheduling approaches.
+    Classifies existing operations into:
+
+    - **A1** — finished operations (set to ``None``)
+    - **A2** — operations in progress at ``disruption_time``
+    - **A3** — unprocessed operations (remain in schedule)
+
+    Then appends the new arriving jobs and re-optimizes using either
+    :func:`sustainableJSP_resch` or :func:`dual_resource_JSP`.
+
+    Parameters
+    ----------
+    new_job : list of list of tuple
+        New arriving jobs. Same format as ``case1``:
+        each job is a list of ``(machine_id, duration)`` tuples.
+    disruption_time : float
+        Time at which the new jobs arrive and rescheduling is triggered.
+    case1 : list of list of tuple
+        Original job data from the initial schedule.
+    case1_solution_optimum : dict[int, list]
+        Phase 1 solution from the initial schedule (machine → operation list).
+    Time_schedule_P2 : dict
+        Time schedule from the initial schedule. Keys are ``(job_id, op_id)``.
+    fair_operator_assignment : dict[int, list]
+        Operator assignment from the initial schedule.
+    workload_list : dict[int, list]
+        Cumulative workload history per operator from the initial schedule.
+    event_times : dict[int, list]
+        Event timestamps per operator from the initial schedule.
+    EErate : list of list of float
+        Energy expenditure rate table (operator × machine).
+    carbon_emission_data : dict[int, list[float]] or None, optional
+        Required when ``dual_resource=False``. Default ``None``.
+    dual_resource : bool, optional
+        If ``True``, use :func:`dual_resource_JSP` (no carbon). Default ``False``.
+    weight : float, optional
+        Time/carbon trade-off weight for Phase 2 (sustainable mode). Default 0.75.
+    visualization : bool, optional
+        Show Gantt chart after rescheduling. Default ``True``.
+    obj_type : str, optional
+        Time objective. One of ``"cmax"``, ``"flowtime"``, ``"cmax+flowtime"``.
+        Default ``"cmax+flowtime"``.
+    workload_obj_type : str, optional
+        Workload objective for Phase 3. Default ``"variance"``.
+    IR : float, optional
+        Impact ratio for combined objective. Default 3.
+    flowtime_type : str, optional
+        ``"average"`` or ``"total"`` flowtime. Default ``"average"``.
+    num_iterations1, num_iterations2 : int, optional
+        GA iteration counts for Phase 1 and Phase 2. Default 1500.
+    population_size1, population_size2 : int, optional
+        GA population sizes. Default 75.
+    elit_percentage1, elit_percentage2 : float, optional
+        Elite fractions. Default 0.6.
+    coloni_size : int, optional
+        Ant colony size for Phase 3. Default 450.
+    alpha, beta : float, optional
+        Ant colony parameters. Default 10 and 2.
+    show_progress : bool, optional
+        Show ``tqdm`` progress bars. Default ``False``.
+
+    Returns
+    -------
+    dict
+        Contains ``"mode"`` (``"sustainable"`` or ``"dual_resource"``) plus all
+        keys from :func:`sustainableJSP_resch` or :func:`dual_resource_JSP`.
+
+    Raises
+    ------
+    ValueError
+        If ``dual_resource=False`` and ``carbon_emission_data`` is ``None``.
     """
     if not dual_resource and carbon_emission_data is None:
         raise ValueError(
@@ -222,13 +287,71 @@ def reschedule_rework(
         alpha=10,
         beta=2):
     """
-    Completely Reschedule job shop operations when certain operations need to be reworked.
+    Completely reschedule when specific operations must be reworked.
 
-    Handles rescheduling scenarios where specific operations need to be redone due to quality issues
-    or defects using completely reschedule strategy. It: (1) determines disruption time from the
-    rework operations' completion time, (2) validates that all rework operations finish at the same
-    time, (3) classifies existing operations into A1, A2, and A3, (4) removes finished and ongoing
-    operations EXCEPT the rework operations, and (5) performs optimization.
+    The disruption time is inferred from the ``finished_time`` of the rework
+    operations. All completed/in-progress operations are removed from the
+    schedule **except** the rework operations themselves, which are re-inserted
+    for re-optimization.
+
+    Parameters
+    ----------
+    rework_operation : list of tuple
+        List of ``(job_id, op_id)`` tuples identifying operations to redo.
+        All operations must have the same ``finished_time``; otherwise the
+        function returns ``None``.
+    case1 : list of list of tuple
+        Original job data from the initial schedule.
+    case1_solution_optimum : dict[int, list]
+        Phase 1 solution from the initial schedule.
+    Time_schedule_P2 : dict
+        Time schedule from the initial schedule. Keys are ``(job_id, op_id)``.
+    fair_operator_assignment : dict[int, list]
+        Operator assignment from the initial schedule.
+    workload_list : dict[int, list]
+        Cumulative workload history per operator.
+    event_times : dict[int, list]
+        Event timestamps per operator.
+    EErate : list of list of float
+        Energy expenditure rate table (operator × machine).
+    carbon_emission_data : dict[int, list[float]] or None, optional
+        Required when ``dual_resource=False``. Default ``None``.
+    dual_resource : bool, optional
+        Use :func:`dual_resource_JSP` instead of :func:`sustainableJSP_resch`.
+        Default ``False``.
+    weight : float, optional
+        Time/carbon trade-off weight. Default 0.75.
+    visualization : bool, optional
+        Show Gantt chart after rescheduling. Default ``True``.
+    obj_type : str, optional
+        Time objective type. Default ``"cmax+flowtime"``.
+    workload_obj_type : str, optional
+        Workload objective for Phase 3. Default ``"variance"``.
+    IR : float, optional
+        Impact ratio. Default 3.
+    flowtime_type : str, optional
+        ``"average"`` or ``"total"`` flowtime. Default ``"average"``.
+    num_iterations1, num_iterations2 : int, optional
+        GA iteration counts. Default 1500.
+    population_size1, population_size2 : int, optional
+        GA population sizes. Default 75.
+    elit_percentage1, elit_percentage2 : float, optional
+        Elite fractions. Default 0.6.
+    coloni_size : int, optional
+        Ant colony size for Phase 3. Default 450.
+    alpha, beta : float, optional
+        Ant colony parameters. Default 10 and 2.
+
+    Returns
+    -------
+    dict or None
+        Contains ``"mode"`` plus all keys from the underlying scheduler,
+        or ``None`` if rework operations have mismatched finish times.
+
+    Raises
+    ------
+    ValueError
+        If ``dual_resource=False`` and ``carbon_emission_data`` is ``None``.
     """
     disruption_time = Time_schedule_P2[rework_operation[0]]['finished_time']
 
@@ -390,13 +513,73 @@ def reschedule_cancelled_job(
         workload_obj_type="variance",
         show_progress: bool = False):
     """
-    Completely Reschedule job shop operations when certain jobs are cancelled at a disruption time.
+    Completely reschedule when one or more jobs are cancelled at a disruption time.
 
-    Handles rescheduling scenarios where specific jobs need to be cancelled during schedule execution
-    using completely reschedule strategy. It: (1) normalizes job IDs to cancel into a set,
-    (2) classifies existing operations into A1, A2, and A3, (3) identifies cancelled operations
-    from active operations whose job_id is in the cancellation set, (4) removes cancelled operations
-    and done operations from the job data, and (5) performs optimization.
+    Operations belonging to the cancelled jobs are removed from the schedule.
+    Finished (A1) and in-progress (A2) operations of remaining jobs are set to
+    ``None`` to preserve their results. The remaining unprocessed work is
+    re-optimized.
+
+    Parameters
+    ----------
+    cancel_job_id : int or list of int or set of int
+        Job ID(s) to cancel (1-indexed). Accepts a single int, list, or set.
+    disruption_time : float
+        Time at which the cancellation is triggered.
+    case1 : list of list of tuple
+        Original job data from the initial schedule.
+    case1_solution_optimum : dict[int, list]
+        Phase 1 solution from the initial schedule.
+    Time_schedule_P2 : dict
+        Time schedule from the initial schedule. Keys are ``(job_id, op_id)``.
+    fair_operator_assignment : dict[int, list]
+        Operator assignment from the initial schedule.
+    workload_list : dict[int, list]
+        Cumulative workload history per operator.
+    event_times : dict[int, list]
+        Event timestamps per operator.
+    EErate : list of list of float
+        Energy expenditure rate table (operator × machine).
+    carbon_emission_data : dict[int, list[float]] or None, optional
+        Required when ``dual_resource=False``. Default ``None``.
+    dual_resource : bool, optional
+        Use :func:`dual_resource_JSP` instead of :func:`sustainableJSP_resch`.
+        Default ``False``.
+    weight : float, optional
+        Time/carbon trade-off weight. Default 0.75.
+    visualization : bool, optional
+        Show Gantt chart after rescheduling. Default ``True``.
+    obj_type : str, optional
+        Time objective type. Default ``"cmax"``.
+    workload_obj_type : str, optional
+        Workload objective for Phase 3. Default ``"variance"``.
+    IR : float, optional
+        Impact ratio. Default 3.
+    flowtime_type : str, optional
+        ``"average"`` or ``"total"`` flowtime. Default ``"average"``.
+    num_iterations1, num_iterations2 : int, optional
+        GA iteration counts. Default 1500.
+    population_size1, population_size2 : int, optional
+        GA population sizes. Default 75.
+    elit_percentage1, elit_percentage2 : float, optional
+        Elite fractions. Default 0.6.
+    coloni_size : int, optional
+        Ant colony size for Phase 3. Default 450.
+    alpha, beta : float, optional
+        Ant colony parameters. Default 10 and 2.
+    show_progress : bool, optional
+        Show ``tqdm`` progress bars. Default ``False``.
+
+    Returns
+    -------
+    dict
+        Contains ``"mode"`` (``"sustainable"`` or ``"dual_resource"``) plus all
+        keys from :func:`sustainableJSP_resch` or :func:`dual_resource_JSP`.
+
+    Raises
+    ------
+    ValueError
+        If ``dual_resource=False`` and ``carbon_emission_data`` is ``None``.
     """
     if isinstance(cancel_job_id, (list, tuple, set)):
         cancel_job_set = set(cancel_job_id)

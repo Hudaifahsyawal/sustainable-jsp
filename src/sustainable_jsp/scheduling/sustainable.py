@@ -93,14 +93,112 @@ def sustainableJSP_resch(
         show_progress: bool = False
         ) -> dict:
     """
-    Solve Sustainable Job Shop Scheduling Problem with rescheduling capabilities using three-phase optimization.
+    Solve the Sustainable Job Shop Scheduling Problem using three-phase optimization.
 
-    This function implements a three-phase optimization approach for sustainable job shop scheduling:
-    - Phase 1: Machine-operation sequence optimization using ARGA to minimize time objective.
-    - Phase 2: Speed level optimization using GANBI to balance time objective and carbon emissions.
-    - Phase 3: Operator assignment optimization using Ant Work Balance Optimizer (AWBO) algorithm.
+    Implements a three-phase pipeline:
 
-    The function supports both initial scheduling and rescheduling scenarios.
+    - **Phase 1** — ARGA (genetic algorithm) optimizes machine-operation sequences to
+      minimize the time objective (Cmax, flowtime, or combined).
+    - **Phase 2** — GANBI optimizes speed levels for each operation, balancing the time
+      objective against total carbon emissions using a weighted-sum scalarization.
+    - **Phase 3** — AWBO (ant colony) assigns operators to operations to balance workload.
+
+    Supports both initial scheduling (``reschedule=False``) and rescheduling scenarios
+    (``reschedule=True``) where some operations are already finished or in progress.
+
+    Parameters
+    ----------
+    case1_reschedule : list of list of tuple or None
+        Job data. Each job is a list of ``(machine_id, duration)`` tuples.
+        ``None`` entries mark finished or cancelled operations (used in rescheduling).
+    carbon_emission_data : dict[int, list[float]]
+        Carbon emission rates per machine. Key = machine ID (1-indexed).
+        Each value is a list of rates for different speed levels.
+    EErate : list of list of float
+        Energy expenditure rate table. ``EErate[operator][machine]`` gives the EE
+        rate for that operator-machine combination.
+    population_size1 : int, optional
+        GA population size for Phase 1. Default 50.
+    num_iterations1 : int, optional
+        Number of GA generations for Phase 1. Default 1500.
+    mutation_threshold1 : float, optional
+        Mutation probability for Phase 1. Default 0.5.
+    elit_percentage1 : float, optional
+        Fraction of elite solutions preserved in Phase 1. Default 0.6.
+    num_iterations2 : int, optional
+        Number of GA generations for Phase 2. Default 1500.
+    population_size2 : int, optional
+        GA population size for Phase 2. Default 75.
+    elit_percentage2 : float, optional
+        Fraction of elite solutions preserved in Phase 2. Default 0.6.
+    mutation_threshold2 : float, optional
+        Mutation probability for Phase 2. Default 0.5.
+    weight : float, optional
+        Weight for the time objective in Phase 2 scalarization (``1-weight`` for
+        carbon). Range [0, 1]. Default 0.75.
+    visualization : bool, optional
+        If ``True``, display the Gantt chart after optimization. Default ``True``.
+    reschedule : bool, optional
+        Set to ``True`` when called from a rescheduling context. Default ``False``.
+    machine_start_time : dict[int, float] or None, optional
+        Earliest available time per machine (rescheduling only). Default ``None``.
+    prob : float, optional
+        Ant selection probability parameter for AWBO. Default 0.95.
+    coloni_size : int, optional
+        Number of ant solutions generated in Phase 3. Default 450.
+    alpha : float, optional
+        Influence of pheromone in operator selection. Default 10.
+    beta : float, optional
+        Influence of heuristic in operator selection. Default 2.
+    obj_type : str, optional
+        Time objective type. One of ``"cmax"``, ``"flowtime"``,
+        ``"cmax+flowtime"``. Default ``"cmax"``.
+    workload_obj_type : str, optional
+        Workload objective for Phase 3. One of ``"variance"``, ``"mean"``,
+        ``"maximum"``, ``"std_dev"``, ``"coef_variation"``. Default ``"variance"``.
+    IR : float, optional
+        Impact ratio used in combined objective calculation. Default 3.
+    flowtime_type : str, optional
+        Flowtime aggregation method. One of ``"average"``, ``"total"``. Default ``"average"``.
+    show_progress : bool, optional
+        Show ``tqdm`` progress bars for Phase 1 and Phase 2. Default ``False``.
+    title : str or None, optional
+        Title for the Gantt chart. Default ``None``.
+    save : bool, optional
+        Save the Gantt chart to a PDF file. Default ``False``.
+    x_start, x_end : float or None, optional
+        X-axis limits for the Gantt chart. Default ``None``.
+
+    Returns
+    -------
+    dict
+        A dictionary with the following keys:
+
+        - ``"case_reschedule"`` : list — final job data (with completed ops restored)
+        - ``"solution"`` : dict[int, list] — machine → ordered operation list
+        - ``"speedlevel_optimum"`` : list — speed level per operation (Phase 2 result)
+        - ``"time_schedule"`` : dict — ``(job_id, op_id)`` → schedule info dict
+        - ``"fair_workload"`` : dict[int, list] — operator → assigned operations
+        - ``"workload_list"`` : dict[int, list] — cumulative workload history per operator
+        - ``"event_times"`` : dict[int, list] — event timestamps per operator
+        - ``"matrix_performance"`` : dict — ``time_objective``, ``TCE``, workload stats
+        - ``"bound"`` : dict — LB/UB for time and carbon objectives
+
+    Examples
+    --------
+    >>> import json
+    >>> from sustainable_jsp import sustainableJSP_resch
+    >>> from sustainable_jsp.algorithms.workload import calculate_EErate
+    >>> with open("examples/Dataset/Dataset_Jobs/J14D30M5.json") as f:
+    ...     jobs_data = [[tuple(op) for op in job] for job in json.load(f)]
+    >>> with open("examples/Dataset/Dataset_Carbon/Carbon_data_J14D30M5.json") as f:
+    ...     carbon = {int(k): v for k, v in json.load(f).items()}
+    >>> with open("examples/Dataset/Dataset_Operator/operators_data_J14D30M5.json") as f:
+    ...     EErate = calculate_EErate({int(k): v for k, v in json.load(f).items()})
+    >>> result = sustainableJSP_resch(jobs_data, carbon, EErate,
+    ...                               num_iterations1=500, num_iterations2=500,
+    ...                               show_progress=True)
+    >>> print(result["matrix_performance"])
     """
     print(f"\n {'-'*20}\nStart optimization phase 1\n{'-'*20}")
     # print(f"check nilai a2_info: {a2_info}")

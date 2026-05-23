@@ -444,9 +444,50 @@ def AWBO(
         a2_info=None,
         obj_type="variance"):
     """
-    Distribute workload fairly among operators using Ant Work Balance (AWB) algorithm.
+    Distribute workload among operators using the Ant Work Balance Optimizer (AWBO).
 
-    obj_type: Objective to minimize. One of "variance", "mean", "maximum", "std_dev", "coef_variation".
+    Each "ant" constructs a complete operator assignment by greedily assigning
+    operations to operators using a probabilistic rule based on current workload
+    (pheromone) and energy expenditure rate (heuristic). The best assignment
+    across ``coloni_size`` ants is returned.
+
+    Parameters
+    ----------
+    EErate : list of list of float
+        Energy expenditure rate table. ``EErate[operator][machine]`` (0-indexed).
+    jobs_data : list of list of tuple or None
+        Job data. Each job is a list of ``(machine_id, duration)`` tuples.
+    schedule_jobs_phase2 : dict
+        Time schedule (Phase 2 result). Keys are ``(job_id, op_id)``.
+    solution_phase1 : list
+        Phase 1 result as returned by :func:`ARGA`: ``[solution_dict, obj, ...]``.
+    prob : float, optional
+        Probability of using the greedy best-operator selection. Default 0.95.
+    coloni_size : int, optional
+        Number of ant solutions to generate. Default 50.
+    alpha : float, optional
+        Influence weight of pheromone (current workload) in selection. Default 10.
+    beta : float, optional
+        Influence weight of heuristic (EE rate) in selection. Default 2.
+    reschedule : bool, optional
+        Enable rescheduling mode (uses ``initial_workload`` / ``initial_ready_time``).
+        Default ``False``.
+    initial_workload : dict[int, float] or None, optional
+        Accumulated workload per operator at disruption time. Default ``None``.
+    initial_ready_time : dict[int, float] or None, optional
+        Earliest availability time per operator at disruption time. Default ``None``.
+    a2 : list of tuple or None, optional
+        In-progress operations to exclude from new assignment. Default ``None``.
+    a2_info : dict or None, optional
+        Schedule info for A2 operations. Default ``None``.
+    obj_type : str, optional
+        Workload objective to minimise. One of ``"variance"``, ``"mean"``,
+        ``"maximum"``, ``"std_dev"``, ``"coef_variation"``. Default ``"variance"``.
+
+    Returns
+    -------
+    dict[int, list]
+        Best operator assignment: operator ID → list of ``(job_id, op_id)`` tuples.
     """
     if initial_workload is None:
         initial_workload = {}

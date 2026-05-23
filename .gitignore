@@ -42,6 +42,9 @@ results/
 !examples/Dataset/**/*.json
 *.pdf
 
+# Sphinx build output
+docs/_build/
+
 # OS
 .DS_Store
 Thumbs.db

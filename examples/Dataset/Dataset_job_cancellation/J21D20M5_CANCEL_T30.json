@@ -1,7 +1,1 @@
-{
-  "disruption_time": 30,
-  "cancel_job_ids": [
-    4,
-    16
-  ]
-}
+[4,16]
