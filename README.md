@@ -2,6 +2,8 @@
 
 A Python package for Sustainable Job Shop Scheduling with multi-objective optimization and dynamic rescheduling.
 
+**Documentation:** [https://hudaifahsyawal.github.io/sustainable-jsp/](https://hudaifahsyawal.github.io/sustainable-jsp/)
+
 ## Features
 
 - **Core**: Problem generation, schedule decoding, performance metrics, Gantt visualization
@@ -16,9 +18,25 @@ A Python package for Sustainable Job Shop Scheduling with multi-objective optimi
 For development:
 
 ```bash
-git clone <repo>
-cd sustainableJSP5
+git clone https://github.com/Hudaifahsyawal/sustainable-jsp.git
+cd sustainable-jsp
 pip install -e .
+```
+
+### Documentation
+
+Online API reference and quick-start guide:
+
+**https://hudaifahsyawal.github.io/sustainable-jsp/**
+
+To build docs locally:
+
+```bash
+pip install -r docs/requirements-docs.txt
+cd docs
+make html          # Linux/macOS
+make.bat html      # Windows
+# open docs/_build/html/index.html
 ```
 
 ## Quick Start

@@ -62,3 +62,7 @@ intersphinx_mapping = {
 html_theme = "furo"
 html_static_path = ["_static"]
 html_title = "sustainable-jsp"
+
+# GitHub Pages project site: https://<user>.github.io/<repo>/
+# Set DOCS_BASE_URL=/sustainable-jsp/ in CI; leave unset for local builds.
+html_base_url = os.environ.get("DOCS_BASE_URL", "")
