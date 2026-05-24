@@ -9,7 +9,7 @@ A Python package for Sustainable Job Shop Scheduling with multi-objective optimi
 - **Scheduling**: Three-phase sustainable pipeline (`sustainableJSP_resch`) and dual-resource variant (`dual_resource_JSP`)
 - **Rescheduling**: Complete reschedule for new job arrival, rework, and job cancellation
 - **Similarity**: Needleman-Wunsch sequence alignment for schedule comparison
-- **Physiology**: ANFIS model for operator energy estimation
+- **Physiology**: ANFIS model for operator energy expenditure estimation
 
 ## Installation
 
