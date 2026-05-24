@@ -19,10 +19,10 @@ Features
 --------
 
 - **Three-phase sustainable pipeline** (ARGA → GANBI → AWBO)
-.. <!-- - **Dual-resource scheduling** (no carbon, time + workload only) -->
 - **Dynamic rescheduling**: new job arrival and job cancellation
 - **Gantt chart visualization** with operator and speed-level annotations
 - **9 pre-built benchmark instances** (J14D30, J21D20, J42D10 × M5/M7/M9)
+.. <!-- - **Dual-resource scheduling** (no carbon, time + workload only) -->
 
 
 Indices
